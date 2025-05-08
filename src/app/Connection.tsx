@@ -137,7 +137,7 @@ const Connection: React.FC<ConnectionProps> = ({
     const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(
         null
     );
-    
+
     // Canvas Settings & Channels
     const canvasElementCountRef = useRef<number>(1);
     const maxCanvasElementCountRef = useRef<number>(1);
@@ -391,26 +391,6 @@ const Connection: React.FC<ConnectionProps> = ({
         startLSL();
         wsRef.current.onopen = function () {
             console.log('WebSocket connection established');
-
-            // Send initialization commands
-            // const commands: WebSocketCommand[] = [
-            //     { command: 'reset', parameters: [] },
-            //     { command: 'sdatac', parameters: [] },
-            //     { command: 'wreg', parameters: [0x01, 0x96] },
-            //     { command: 'wreg', parameters: [0x02, 0xc0] },
-            //     { command: 'wreg', parameters: [0x03, 0xec] },
-            //     { command: 'wreg', parameters: [0x15, 0b00100000] },
-            //     { command: 'wreg', parameters: [0x05, 0x60] },
-            //     { command: 'wreg', parameters: [0x06, 0x60] },
-            //     { command: 'wreg', parameters: [0x07, 0x60] },
-            //     { command: 'wreg', parameters: [0x08, 0x60] },
-            //     { command: 'wreg', parameters: [0x09, 0x60] },
-            //     { command: 'wreg', parameters: [0x0a, 0x60] },
-            //     { command: 'wreg', parameters: [0x0b, 0x60] },
-            //     { command: 'wreg', parameters: [0x0c, 0x60] },
-            //     { command: 'status', parameters: [] },
-            //     { command: 'rdatac', parameters: [] },
-            // ];
             const channelConfig = [];
             channelConfig.push(
                 { command: "reset", parameters: [] },
@@ -548,34 +528,9 @@ const Connection: React.FC<ConnectionProps> = ({
                     console.error('Error sending data to backend:', error);
                 });
             // Store EVERY sample
-            sampleBuffer.push(channelData);
+            datastream(channelData);
         }
     };
-
-    // Set up the 20ms interval for sending data
-    const SEND_INTERVAL_MS = 20;
-    let sendInterval = setInterval(() => {
-        if (sampleBuffer.length > 0) {
-            console.log(SAMPLES_PER_BATCH)
-            // Get the samples to send (oldest first)
-            const samplesToSend = sampleBuffer.slice(0, SAMPLES_PER_BATCH);
-
-            // Send the samples
-            samplesToSend.forEach(sample => {
-                datastream(sample);
-            });
-
-            // Remove the sent samples from the buffer
-            sampleBuffer = sampleBuffer.slice(SAMPLES_PER_BATCH);
-        }
-    }, SEND_INTERVAL_MS);
-
-    // Remember to clear the interval when no longer needed
-    // clearInterval(sendInterval);
-
-
-
-    //////////////////////////////////////////
 
     const handlecustomTimeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         // Update custom time input with only numeric values
@@ -597,20 +552,7 @@ const Connection: React.FC<ConnectionProps> = ({
     };
 
 
-
-    type SavedDevice = {
-        usbVendorId: number;
-        usbProductId: number;
-        baudRate: number;
-        serialTimeout: number;
-        selectedChannels: number[];
-        deviceName?: string; // Add deviceName as an optional property
-    };
-
-
     const getFileCountFromIndexedDB = async (): Promise<any[]> => {
-
-
         return new Promise((resolve, reject) => {
             if (workerRef.current) {
                 workerRef.current.postMessage({ action: 'getFileCountFromIndexedDB' });
@@ -766,7 +708,7 @@ const Connection: React.FC<ConnectionProps> = ({
         }
     };
     return (
-        <div className="flex-none items-center justify-center pb-4 bg-g">
+        <div className="flex-none items-center justify-center pb-4 bg-g z-10">
             {/* Left-aligned section */}
             <div className="absolute left-4 flex items-center mx-0 px-0 space-x-1">
                 {isRecordingRef.current && (

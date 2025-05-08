@@ -1,8 +1,8 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "$schema": "https://schema.tauri.app/config/2.0.0-rc",
   "productName": "OSEM Visualiser",
   "version": "0.1.0",
-  "identifier": "ccom.origininterconnect.osem-visualiser",
+  "identifier": "com.origininterconnect.osem-visualiser",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
@@ -25,10 +25,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "msi", "dmg", "rpm"],
     "icon": [
       "icons/oric_logo(300x300px).png",
       "icons/oric_logo.ico"
-    ]
+    ],
+    "macOS": {
+      "entitlements": "src-tauri/Entitlements.plist",
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": "localhost",
+      "frameworks": []
+    }
   }
 }
