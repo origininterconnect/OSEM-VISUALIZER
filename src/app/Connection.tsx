@@ -6,6 +6,7 @@ import { EXGFilter, Notch, five } from './filters';
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation"; // Import useRouter
 import { getCustomColor } from './Colors';
+import { core } from "@tauri-apps/api";
 
 import {
     Cable,
@@ -136,8 +137,7 @@ const Connection: React.FC<ConnectionProps> = ({
     const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(
         null
     );
-    const portRef = useRef<SerialPort | null>(null); // Ref to store the serial port
-
+    
     // Canvas Settings & Channels
     const canvasElementCountRef = useRef<number>(1);
     const maxCanvasElementCountRef = useRef<number>(1);
@@ -232,21 +232,7 @@ const Connection: React.FC<ConnectionProps> = ({
 
         let initialSelectedChannelsRefs: number[] = []; // Default to channel 1
 
-        // Ensure port info is available
-        const portInfo = portRef.current?.getInfo();
-        if (portInfo) {
-            const { usbVendorId, usbProductId } = portInfo;
-            const deviceIndex = savedPorts.findIndex(
-                (saved: SavedDevice) =>
-                    saved.usbVendorId === usbVendorId && saved.usbProductId === usbProductId
-            );
 
-            if (deviceIndex !== -1) {
-                // Load saved channels from localStorage
-                const savedChannels = savedPorts[deviceIndex]?.selectedChannels || [];
-                initialSelectedChannelsRefs = savedChannels.length > 0 ? savedChannels : enabledChannels;
-            }
-        }
 
         setSelectedChannels(initialSelectedChannelsRefs);
 
@@ -254,7 +240,7 @@ const Connection: React.FC<ConnectionProps> = ({
         const allSelected = initialSelectedChannelsRefs.length === enabledChannels.length;
         setIsAllEnabledChannelSelected(allSelected);
         setIsSelectAllDisabled(initialSelectedChannelsRefs.length === enabledChannels.length - 1);
-    }, [deviceReady, maxCanvasElementCountRef.current, portRef.current]);
+    }, [deviceReady, maxCanvasElementCountRef.current]);
 
 
     useEffect(() => {
@@ -303,19 +289,8 @@ const Connection: React.FC<ConnectionProps> = ({
 
             // Retrieve saved devices from localStorage
             const savedPorts = JSON.parse(localStorage.getItem('savedDevices') || '[]');
-            const portInfo = portRef.current?.getInfo();
 
-            if (portInfo) {
-                const deviceIndex = savedPorts.findIndex(
-                    (saved: SavedDevice) => saved.deviceName === devicenameref.current
-                );
 
-                if (deviceIndex !== -1) {
-                    savedPorts[deviceIndex].selectedChannels = sortedChannels;
-                    localStorage.setItem('savedDevices', JSON.stringify(savedPorts));
-
-                }
-            }
 
             return sortedChannels;
         });
@@ -405,10 +380,15 @@ const Connection: React.FC<ConnectionProps> = ({
         }
 
     };
+    const startLSL = async () => {
+        const sps = 250// can come from user input
+        await core.invoke("start_lsl_stream", { sps });
+    };
     const wsRef = useRef<WebSocket | null>(null);
     const connectToDevice = () => {
         wsRef.current = new WebSocket('ws://oric.local:81');
         console.log("clicked");
+        startLSL();
         wsRef.current.onopen = function () {
             console.log('WebSocket connection established');
 
@@ -560,7 +540,13 @@ const Connection: React.FC<ConnectionProps> = ({
                     )
                 );
             }
-
+            core.invoke('start_streaming', { channelData: channelData })
+                .then((response) => {
+                    console.log('Data sent to backend successfully:', response);
+                })
+                .catch((error) => {
+                    console.error('Error sending data to backend:', error);
+                });
             // Store EVERY sample
             sampleBuffer.push(channelData);
         }
@@ -712,133 +698,6 @@ const Connection: React.FC<ConnectionProps> = ({
 
     }, [selectedChannels]);
 
-    // // Function to read data from a connected device and process it
-    // const readData = async (): Promise<void> => {
-    //     const HEADER_LENGTH = 3; // Length of the packet header
-    //     const NUM_CHANNELS = maxCanvasElementCountRef.current; // Number of channels in the data packet
-    //     const PACKET_LENGTH = NUM_CHANNELS * 2 + HEADER_LENGTH + 1; // Total length of each packet
-    //     const SYNC_BYTE1 = 0xc7; // First synchronization byte to identify the start of a packet
-    //     const SYNC_BYTE2 = 0x7c; // Second synchronization byte
-    //     const END_BYTE = 0x01; // End byte to signify the end of a packet
-    //     let previousCounter: number | null = null; // Variable to store the previous counter value for loss detection
-    //     const notchFilters = Array.from({ length: maxCanvasElementCountRef.current }, () => new Notch());
-    //     const EXGFilters = Array.from({ length: maxCanvasElementCountRef.current }, () => new EXGFilter());
-    //     notchFilters.forEach((filter) => {
-    //         filter.setbits(sampingrateref.current); // Set the bits value for all instances
-    //     });
-    //     EXGFilters.forEach((filter) => {
-    //         filter.setbits(detectedBitsRef.current.toString(), sampingrateref.current); // Set the bits value for all instances
-    //     });
-    //     try {
-    //         while (isDeviceConnectedRef.current) {
-    //             const streamData = await readerRef.current?.read(); // Read data from the device
-    //             if (streamData?.done) {
-    //                 // Check if the data stream has ended
-    //                 console.log("Thank you for using our app!"); // Log a message when the stream ends
-    //                 break; // Exit the loop if the stream is done
-    //             }
-    //             if (streamData) {
-    //                 const { value } = streamData; // Destructure the stream data to get its value
-    //                 buffer.push(...value); // Add the incoming data to the buffer
-    //             }
-
-    //             // Process packets while the buffer contains at least one full packet
-    //             while (buffer.length >= PACKET_LENGTH) {
-    //                 // Find the index of the synchronization bytes in the buffer
-    //                 const syncIndex = buffer.findIndex(
-    //                     (byte, index) =>
-    //                         byte === SYNC_BYTE1 && buffer[index + 1] === SYNC_BYTE2
-    //                 );
-
-    //                 if (syncIndex === -1) {
-    //                     // If no sync bytes are found, clear the buffer and continue
-    //                     buffer.length = 0; // Clear the buffer
-    //                     continue;
-    //                 }
-
-    //                 if (syncIndex + PACKET_LENGTH <= buffer.length) {
-    //                     // Check if a full packet is available in the buffer
-    //                     const endByteIndex = syncIndex + PACKET_LENGTH - 1; // Calculate the index of the end byte
-
-    //                     if (
-    //                         buffer[syncIndex] === SYNC_BYTE1 &&
-    //                         buffer[syncIndex + 1] === SYNC_BYTE2 &&
-    //                         buffer[endByteIndex] === END_BYTE
-    //                     ) {
-    //                         // Validate the packet by checking the sync and end bytes
-    //                         const packet = buffer.slice(syncIndex, syncIndex + PACKET_LENGTH); // Extract the packet from the buffer
-    //                         const channelData: number[] = []; // Array to store the extracted channel data
-    //                         const counter = packet[2]; // Extract the counter value from the packet
-    //                         channelData.push(counter); // Add the counter to the channel data
-    //                         for (let channel = 0; channel < NUM_CHANNELS; channel++) {
-    //                             const highByte = packet[channel * 2 + HEADER_LENGTH];
-    //                             const lowByte = packet[channel * 2 + HEADER_LENGTH + 1];
-    //                             const value = (highByte << 8) | lowByte;
-
-    //                             channelData.push(
-    //                                 notchFilters[channel].process(
-    //                                     EXGFilters[channel].process(
-    //                                         value,
-    //                                         appliedEXGFiltersRef.current[channel]
-    //                                     ),
-    //                                     appliedFiltersRef.current[channel]
-    //                                 )
-    //                             );
-
-    //                         }
-    //                         datastream(channelData); // Pass the channel data to the LineData function for further processing
-    //                         if (isRecordingRef.current) {
-    //                             const channeldatavalues = channelData
-    //                                 .slice(0, canvasElementCountRef.current + 1)
-    //                                 .map((value) => (value !== undefined ? value : null))
-    //                                 .filter((value): value is number => value !== null); // Filter out null values
-    //                             // Check if recording is enabled
-    //                             recordingBuffers[activeBufferIndex][fillingindex.current] = channeldatavalues;
-
-    //                             if (fillingindex.current >= MAX_BUFFER_SIZE - 1) {
-    //                                 processBuffer(activeBufferIndex, canvasElementCountRef.current, selectedChannels);
-    //                                 activeBufferIndex = (activeBufferIndex + 1) % NUM_BUFFERS;
-    //                             }
-    //                             fillingindex.current = (fillingindex.current + 1) % MAX_BUFFER_SIZE;
-    //                             const elapsedTime = Date.now() - recordingStartTimeRef.current;
-    //                             setRecordingElapsedTime((prev) => {
-    //                                 if (endTimeRef.current !== null && elapsedTime >= endTimeRef.current) {
-    //                                     stopRecording();
-    //                                     return endTimeRef.current;
-    //                                 }
-    //                                 return elapsedTime;
-    //                             });
-
-    //                         }
-
-    //                         if (previousCounter !== null) {
-    //                             // If there was a previous counter value, check for data loss
-    //                             const expectedCounter: number = (previousCounter + 1) % 256; // Calculate the expected counter value
-    //                             if (counter !== expectedCounter) {
-    //                                 // Check for data loss by comparing the current counter with the expected counter
-    //                                 console.warn(
-    //                                     `Data loss detected! Previous counter: ${previousCounter}, Current counter: ${counter}`
-    //                                 );
-    //                             }
-    //                         }
-    //                         previousCounter = counter; // Update the previous counter with the current counter
-    //                         buffer.splice(0, endByteIndex + 1); // Remove the processed packet from the buffer
-    //                     } else {
-    //                         buffer.splice(0, syncIndex + 1); // If packet is incomplete, remove bytes up to the sync byte
-    //                     }
-    //                 } else {
-    //                     break; // If a full packet is not available, exit the loop and wait for more data
-    //                 }
-    //             }
-    //         }
-    //     } catch (error) {
-    //         console.error("Error reading from device:", error); // Handle any errors that occur during the read process
-    //     } finally {
-    //         await disconnectDevice(); // Ensure the device is disDeviceConnected when finished
-    //     }
-    // };
-
-    // Function to handle the recording process
     const handleRecord = async () => {
         if (isRecordingRef.current) {
             // Stop the recording if it is currently active
@@ -1021,7 +880,7 @@ const Connection: React.FC<ConnectionProps> = ({
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
-     
+
 
 
                 {isDeviceConnected && (
@@ -1389,7 +1248,7 @@ const Connection: React.FC<ConnectionProps> = ({
                     </Popover>
                 )}
 
-                {isDeviceConnected  && (
+                {isDeviceConnected && (
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button className="flex items-center justify-center select-none whitespace-nowrap rounded-lg" >

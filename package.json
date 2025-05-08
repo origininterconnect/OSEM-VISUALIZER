@@ -2,13 +2,13 @@
   "name": "OSEM-Visualiser",
   "version": "0.1.0",
   "private": true,
-"scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "tauri": "tauri",
-  "tauri:dev": "tauri dev",
-  "tauri:build": "tauri build"
-},
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-avatar": "^1.0.4",
