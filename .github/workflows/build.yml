@@ -59,7 +59,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 18.16.1
+
+      - name: Install macOS canvas dependencies
+        if: runner.os == 'macOS'
+        run: |
+            brew install pkg-config cairo pango libpng jpeg giflib librsvg
+                  
+          
       - name: Install Dependencies
         run: |
           npm install
